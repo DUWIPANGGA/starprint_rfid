@@ -28,14 +28,16 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 #define RELAY_PIN 14   // ESP32 pin GPIO21
 #define BUZZER_PIN 13  // ESP32 pin GPIO22
 #define DOOR_SENSOR_PIN 27
-
+#define BUTTON_PIN 25
 // Konfigurasi EEPROM
 #define EEPROM_SIZE 64
 #define RELAY_STATE_ADDR 0
 #define WIFI_SSID_ADDR 10
 #define WIFI_PASS_ADDR 40
 
-
+bool buttonPressed = false;
+unsigned long lastButtonPress = 0;
+const unsigned long BUTTON_DEBOUNCE = 200;
 String deviceKey = "";
 String ap_name;
 String ap_pass;
@@ -106,6 +108,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   initLittleFS();
+  initButton();
   // initEEPROM();
   generateDeviceId();
   loadWiFiCredentials();
@@ -159,6 +162,7 @@ loopCard();
     loopBuzzer();
     loopDoor();
     relayLoop();
+    loopButton();
     // Auto-exit AP mode after 10 minutes
     if (millis() - apStartTime > 600000) {
       Serial.println("AP mode timeout, restarting...");
@@ -169,6 +173,7 @@ loopCard();
     handleMQTTConnection();
     client.loop();
     ArduinoOTA.handle();
+        loopButton();
     loopCard();
     loopBuzzer();
     loopDoor();
