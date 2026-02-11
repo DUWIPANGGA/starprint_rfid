@@ -289,12 +289,14 @@ void processCard() {
         Serial.println(cardName);
         AccessState = ACCESS_GRANTED;
         beepRequest = 1;
+        // sendAccessLog(currentUID, cardName, true);
       } else {
         Serial.println(F("❌ Kartu tidak dikenal"));
         Serial.print(F("UID: "));
         Serial.println(currentUID);
         beepRequest = 2;
         AccessState = ACCESS_DENIED;
+        // sendAccessLog(currentUID, cardName, true);
       }
 
       // Log the access attempt

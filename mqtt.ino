@@ -2,6 +2,24 @@ void setupMQTT() {
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(mqttCallback);
 }
+void sendAccessLog(String uid, String name, bool granted) {
+  DynamicJsonDocument logDoc(512);
+
+  logDoc["id"] = deviceId;
+  logDoc["action"] = "rfid_access_log";
+  logDoc["uid"] = uid;
+  logDoc["name"] = name;
+  logDoc["status"] = granted ? "granted" : "denied";
+  logDoc["timestamp"] = millis(); // atau RTC / NTP kalau ada
+
+  String jsonStr;
+  serializeJson(logDoc, jsonStr);
+
+  client.publish("starprint/rfid/access_log", jsonStr.c_str());
+
+  Serial.println("📤 Access log terkirim:");
+  Serial.println(jsonStr);
+}
 // Fungsi untuk memulai mode tertentu
 void startRFIDMode(RFIDMode mode, String name = "") {
   currentRFIDMode = mode;
@@ -36,8 +54,8 @@ void publishRFIDScan(String uid, String name = "", bool registered = false) {
   doc["action"] = "rfid_scan";
   doc["uid"] = uid;
   doc["registered"] = registered;
-  doc["timestamp"] = millis();
-  
+  doc["timestamp"] = sysTime.datetime; 
+  doc["timestamp_unix"] = sysTime.unix; 
   if (registered && name != "") {
     doc["name"] = name;
   } else {
@@ -151,6 +169,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     if (state == "ON") {
       AccessState = ACCESS_GRANTED;
       // setRelayState(true);
+      
       beepRequest = 1;
       Serial.println("🔌 Relay ON");
     } 
