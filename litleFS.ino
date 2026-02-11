@@ -102,6 +102,23 @@ void saveDefaultConfig() {
 
   Serial.println("📝 Default config created");
 }
+void resetDeviceConfig() {
+  StaticJsonDocument<JSON_SIZE> doc;
+
+  doc["wifi_ssid"] = "";
+  doc["wifi_pass"] = "";
+  doc["ap_name"] = "Starprint Smart RFID";
+  doc["ap_pass"] = "88888888";
+  doc["mqtt_host"] = "broker.emqx.io";
+  doc["mqtt_port"] = 1883;
+  doc["interval"]  = 5000;
+  doc["mode"]      = "auto";
+  File file = LittleFS.open(CONFIG_FILE, "w");
+  serializeJsonPretty(doc, file);
+  file.close();
+
+  Serial.println("device config reset");
+}
 
 void updateJson(const char* key, const char* value) {
   StaticJsonDocument<JSON_SIZE> doc;

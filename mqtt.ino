@@ -66,7 +66,8 @@ void sendRFIDResponse(String status, String message, String uid = "", String nam
     doc["name"] = name;
   }
   
-  doc["timestamp"] = millis();
+  doc["timestamp"] = sysTime.datetime;
+  doc["timestamp_unix"] = sysTime.unix; 
   
   String jsonStr;
   serializeJson(doc, jsonStr);
@@ -205,34 +206,44 @@ void handleRFIDManagement(String message) {
   
   // Mode tap operations
   if (action == "rfid_mode_add") {
+    beepRequest = 3;
     handleAddRFIDMode(doc);
   } 
   else if (action == "rfid_mode_edit") {
+    beepRequest = 3;
     handleEditRFIDMode(doc);
   }
   else if (action == "rfid_mode_delete") {
+    beepRequest = 3;
     handleDeleteRFIDMode(doc);
   }
   else if (action == "rfid_mode_cancel") {
+    beepRequest = 1;
     exitRFIDMode();
     sendRFIDResponse("success", "Mode dibatalkan");
   }
   else if (action == "rfid_add") {
+    beepRequest = 3;
     handleAddRFID(doc);
   } 
   else if (action == "rfid_remove") {
+    beepRequest = 3;
     handleRemoveRFID(doc);
   }
   else if (action == "rfid_edit") {
+    beepRequest = 3;
     handleEditRFID(doc);
   }
   else if (action == "rfid_clear") {
+    beepRequest = 3;
     handleClearRFID(doc);
   }
   else if (action == "rfid_list") {
+    beepRequest = 4;
     handleListRFID(doc);
   }
   else if (action == "rfid_check") {
+    beepRequest = 4;
     handleCheckRFID(doc);
   }
 }

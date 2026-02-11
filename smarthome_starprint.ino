@@ -13,7 +13,9 @@
 #include <ArduinoJson.h>
 #include <SPI.h>
 #include <MFRC522.h>
-
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include <time.h>
 #define SS_PIN 21
 #define RST_PIN 22
 
@@ -34,6 +36,31 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 #define RELAY_STATE_ADDR 0
 #define WIFI_SSID_ADDR 10
 #define WIFI_PASS_ADDR 40
+
+// ===== VARIABLE WAKTU GLOBAL =====
+unsigned long currentUnixTime = 0;      // Waktu saat ini dalam Unix timestamp
+String currentTimeString = "";          // Waktu saat ini dalam format string
+unsigned long startupUnixTime = 0;      // Waktu pertama nyala (Unix timestamp)
+String startupTimeString = "";          // Waktu pertama nyala (format string)
+unsigned long lastTimeUpdate = 0;       // Waktu terakhir update
+bool timeInitialized = false;           // Status inisialisasi waktu
+const unsigned long TIME_UPDATE_INTERVAL = 1000; // Update setiap 1 detik
+
+// Struktur untuk waktu yang mudah diakses
+struct SystemTime {
+  unsigned long unix;           // Unix timestamp
+  String datetime;              // Format: YYYY-MM-DD HH:MM:SS
+  String date;                  // Format: YYYY-MM-DD
+  String time;                  // Format: HH:MM:SS
+  String iso8601;               // Format ISO 8601
+  String timestamp;             // Untuk log: [YYYY-MM-DD HH:MM:SS]
+};
+SystemTime sysTime;             // Variable global waktu sistem
+
+// Untuk NTP
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 7 * 3600;   // GMT+7 (WIB)
+const int daylightOffset_sec = 0;
 
 bool buttonPressed = false;
 unsigned long lastButtonPress = 0;
@@ -117,6 +144,7 @@ void setup() {
   initBuzzer();
   initRFID();
   initDoorSensor();
+  initTime();
   // saveDefaultConfig();
   if (ssid.length() > 0) {
     Serial.println("Connecting to saved WiFi...");
@@ -154,31 +182,44 @@ void setup() {
   // Jika tidak ada WiFi yang tersimpan atau koneksi gagal, start AP mode
   startAPMode();
 }
-
 void loop() {
+  // Update waktu setiap loop
+  updateTime();
+  
   if (inAPMode) {
     server.handleClient();
-loopCard();
-    loopBuzzer();
-    loopDoor();
-    relayLoop();
-    loopButton();
-    // Auto-exit AP mode after 10 minutes
-    if (millis() - apStartTime > 600000) {
-      Serial.println("AP mode timeout, restarting...");
-      ESP.restart();
-    }
-  } else {
-    // Mode STA - hanya handle MQTT dan OTA
-    handleMQTTConnection();
-    client.loop();
-    ArduinoOTA.handle();
-        loopButton();
     loopCard();
     loopBuzzer();
     loopDoor();
     relayLoop();
-    // Tidak ada web server di mode STA
+    loopButton();
+    
+    // Auto-exit AP mode after 10 minutes
+    if (millis() - apStartTime > 600000) {
+      Serial.print(getMQTTTimestamp());
+      Serial.println("AP mode timeout, restarting...");
+      ESP.restart();
+    }
+  } else {
+    // Mode STA
+    handleMQTTConnection();
+    client.loop();
+    ArduinoOTA.handle();
+    loopButton();
+    loopCard();
+    loopBuzzer();
+    loopDoor();
+    relayLoop();
+    
+    // Periodic time sync jika terhubung WiFi
+    static unsigned long lastTimeSync = 0;
+    if (WiFi.status() == WL_CONNECTED && millis() - lastTimeSync > 3600000) { // 1 jam
+      lastTimeSync = millis();
+      if (updateTimeFromNTP()) {
+        Serial.print(getMQTTTimestamp());
+        Serial.println("Periodic time sync completed");
+      }
+    }
   }
 }
 

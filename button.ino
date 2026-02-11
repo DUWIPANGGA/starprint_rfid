@@ -21,7 +21,8 @@ void loopButton() {
 
       Serial.println("🔥 LONG PRESS 10 DETIK");
 
-      beepRequest = 5;
+      beepRequest = 3;
+      resetDeviceConfig();
       ESP.restart();
     }
   }
