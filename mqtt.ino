@@ -10,7 +10,7 @@ void sendAccessLog(String uid, String name, bool granted) {
   logDoc["uid"] = uid;
   logDoc["name"] = name;
   logDoc["status"] = granted ? "granted" : "denied";
-  logDoc["timestamp"] = millis(); // atau RTC / NTP kalau ada
+  logDoc["timestamp"] = millis();  // atau RTC / NTP kalau ada
 
   String jsonStr;
   serializeJson(logDoc, jsonStr);
@@ -26,12 +26,12 @@ void startRFIDMode(RFIDMode mode, String name = "") {
   pendingName = name;
   pendingUID = "";
   modeTimeout = millis() + MODE_TIMEOUT_MS;
-  
+
   // Kirim notifikasi MQTT
   sendModeStatus();
-  
+
   Serial.print("🔧 RFID Mode: ");
-  switch(mode) {
+  switch (mode) {
     case RFID_MODE_ADD:
       Serial.println("ADD - Tunggu tap kartu baru");
       break;
@@ -48,23 +48,23 @@ void startRFIDMode(RFIDMode mode, String name = "") {
 }
 void publishRFIDScan(String uid, String name = "", bool registered = false) {
   if (!client.connected()) return;
-  
+
   DynamicJsonDocument doc(512);
   doc["id"] = deviceId;
   doc["action"] = "rfid_scan";
   doc["uid"] = uid;
   doc["registered"] = registered;
-  doc["timestamp"] = sysTime.datetime; 
-  doc["timestamp_unix"] = sysTime.unix; 
+  doc["timestamp"] = sysTime.datetime;
+  doc["timestamp_unix"] = sysTime.unix;
   if (registered && name != "") {
     doc["name"] = name;
   } else {
     doc["name"] = "Unknown";
   }
-  
+
   String jsonStr;
   serializeJson(doc, jsonStr);
-  
+
   client.publish("starprint/rfid/scan", jsonStr.c_str());
   Serial.println("📤 RFID scan event terkirim");
 }
@@ -75,21 +75,21 @@ void sendRFIDResponse(String status, String message, String uid = "", String nam
   doc["action"] = "rfid_response";
   doc["status"] = status;
   doc["message"] = message;
-  
+
   if (uid != "") {
     doc["uid"] = uid;
   }
-  
+
   if (name != "") {
     doc["name"] = name;
   }
-  
+
   doc["timestamp"] = sysTime.datetime;
-  doc["timestamp_unix"] = sysTime.unix; 
-  
+  doc["timestamp_unix"] = sysTime.unix;
+
   String jsonStr;
   serializeJson(doc, jsonStr);
-  
+
   client.publish("starprint/rfid/response", jsonStr.c_str());
   Serial.println("📤 RFID response terkirim: " + jsonStr);
 }
@@ -106,13 +106,13 @@ void reconnectMQTT() {
     Serial.print("Attempting MQTT connection...");
     if (client.connect(deviceId.c_str())) {
       Serial.println("connected");
-      
+
       // Subscribe ke topic yang diperlukan
       client.subscribe("starprint/device/#");
       client.subscribe("starprint/rfid/#");
-      
+
       Serial.println("✅ Subscribed to RFID topics");
-      
+
       attempts = 0;
       return;
     } else {
@@ -123,7 +123,7 @@ void reconnectMQTT() {
       attempts++;
     }
   }
-  
+
   // Jika gagal connect setelah beberapa percobaan, restart ESP
   if (attempts >= 5) {
     Serial.println("MQTT connection failed, restarting...");
@@ -135,9 +135,14 @@ void reconnectMQTT() {
 // PERBAIKAN: Hapus "void" yang duplikat
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial.print("📨 Message arrived [");
+  if (firstMqttMessage) {
+    Serial.println("First MQTT message ignored");
+    firstMqttMessage = false;
+    return;
+  }
   Serial.print(topic);
   Serial.print("] ");
-  
+
   String message;
   for (int i = 0; i < length; i++) {
     message += (char)payload[i];
@@ -147,13 +152,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   // Parse JSON utama
   DynamicJsonDocument doc(256);
   DeserializationError error = deserializeJson(doc, message);
-  
+
   if (error) {
     Serial.println("❌ Failed to parse MQTT message");
     return;
   }
 
-  String id = doc["id"].as<String>();  // PERBAIKAN: Tambahkan .as<String>()
+  String id = doc["id"].as<String>();
   String action = doc["action"].as<String>();
   String state = doc["state"].as<String>();
   String deviceKeyFromMqtt = doc["device_key"].as<String>();
@@ -169,11 +174,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     if (state == "ON") {
       AccessState = ACCESS_GRANTED;
       // setRelayState(true);
-      
+
       beepRequest = 1;
       Serial.println("🔌 Relay ON");
-    } 
-    else if (state == "OFF") {
+    } else if (state == "OFF") {
       AccessState = ACCESS_DENIED;
       beepRequest = 1;
       // setRelayState(false);
@@ -201,7 +205,7 @@ void sendStatusAck(String state) {
 
   String jsonStr;
   serializeJson(doc, jsonStr);
-  
+
   client.publish("smartpower/device/status", jsonStr.c_str());
   Serial.println("Status terkirim: " + jsonStr);
 }
@@ -209,7 +213,7 @@ void sendStatusAck(String state) {
 void handleRFIDManagement(String message) {
   DynamicJsonDocument doc(512);
   DeserializationError error = deserializeJson(doc, message);
-  
+
   if (error) {
     Serial.println("❌ Failed to parse RFID management JSON");
     return;
@@ -222,46 +226,37 @@ void handleRFIDManagement(String message) {
   }
 
   String action = doc["action"].as<String>();
-  
+
   // Mode tap operations
   if (action == "rfid_mode_add") {
     beepRequest = 3;
     handleAddRFIDMode(doc);
-  } 
-  else if (action == "rfid_mode_edit") {
+  } else if (action == "rfid_mode_edit") {
     beepRequest = 3;
     handleEditRFIDMode(doc);
-  }
-  else if (action == "rfid_mode_delete") {
+  } else if (action == "rfid_mode_delete") {
     beepRequest = 3;
     handleDeleteRFIDMode(doc);
-  }
-  else if (action == "rfid_mode_cancel") {
+  } else if (action == "rfid_mode_cancel") {
     beepRequest = 1;
     exitRFIDMode();
     sendRFIDResponse("success", "Mode dibatalkan");
-  }
-  else if (action == "rfid_add") {
+  } else if (action == "rfid_add") {
     beepRequest = 3;
     handleAddRFID(doc);
-  } 
-  else if (action == "rfid_remove") {
+  } else if (action == "rfid_remove") {
     beepRequest = 3;
     handleRemoveRFID(doc);
-  }
-  else if (action == "rfid_edit") {
+  } else if (action == "rfid_edit") {
     beepRequest = 3;
     handleEditRFID(doc);
-  }
-  else if (action == "rfid_clear") {
+  } else if (action == "rfid_clear") {
     beepRequest = 3;
     handleClearRFID(doc);
-  }
-  else if (action == "rfid_list") {
+  } else if (action == "rfid_list") {
     beepRequest = 4;
     handleListRFID(doc);
-  }
-  else if (action == "rfid_check") {
+  } else if (action == "rfid_check") {
     beepRequest = 4;
     handleCheckRFID(doc);
   }

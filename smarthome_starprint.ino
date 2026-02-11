@@ -45,7 +45,7 @@ String startupTimeString = "";          // Waktu pertama nyala (format string)
 unsigned long lastTimeUpdate = 0;       // Waktu terakhir update
 bool timeInitialized = false;           // Status inisialisasi waktu
 const unsigned long TIME_UPDATE_INTERVAL = 1000; // Update setiap 1 detik
-
+bool firstMqttMessage = true;
 // Struktur untuk waktu yang mudah diakses
 struct SystemTime {
   unsigned long unix;           // Unix timestamp
@@ -144,7 +144,6 @@ void setup() {
   initBuzzer();
   initRFID();
   initDoorSensor();
-  initTime();
   // saveDefaultConfig();
   if (ssid.length() > 0) {
     Serial.println("Connecting to saved WiFi...");
@@ -166,6 +165,7 @@ void setup() {
       setupMQTT();
       setupOTA();
       checkForOTAUpdate();
+      initTime(); 
       currentRFIDMode = RFID_MODE_NORMAL;
       pendingUID = "";
       pendingName = "";
